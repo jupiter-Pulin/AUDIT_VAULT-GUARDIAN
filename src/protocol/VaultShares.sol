@@ -8,7 +8,13 @@ import {UniswapAdapter} from "./investableUniverseAdapters/UniswapAdapter.sol";
 import {DataTypes} from "../vendor/DataTypes.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, ReentrancyGuard {
+contract VaultShares is
+    ERC4626,
+    IVaultShares,
+    AaveAdapter,
+    UniswapAdapter,
+    ReentrancyGuard
+{
     error VaultShares__DepositMoreThanMax(uint256 amount, uint256 max);
     error VaultShares__NotGuardian();
     error VaultShares__NotVaultGuardianContract();
@@ -63,13 +69,17 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
 
     // slither-disable-start reentrancy-eth
     /**
-     * @notice removes all supplied liquidity from Uniswap and supplied lending amount from Aave and then re-invests it back into them only if the vault is active
+     * @notice removes all supplied liquidity from Uniswap and supplied lending amount from Aave
+     * and then re-invests it back into them only if the vault is active
      */
     modifier divestThenInvest() {
-        uint256 uniswapLiquidityTokensBalance = i_uniswapLiquidityToken.balanceOf(address(this));
+        uint256 uniswapLiquidityTokensBalance = i_uniswapLiquidityToken
+            .balanceOf(address(this));
         uint256 aaveAtokensBalance = i_aaveAToken.balanceOf(address(this));
 
         // Divest
+        //这个asset()是从哪里冒出来的？
+        //e 由ERC4626继承而来 返回的是底层资产的地址
         if (uniswapLiquidityTokensBalance > 0) {
             _uniswapDivest(IERC20(asset()), uniswapLiquidityTokensBalance);
         }
@@ -78,23 +88,36 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
         }
 
         _;
+        //written 这里的下划线意味着所有操作都完成后，在检查系统是否是活跃，如果是，将剩余的资金进行了在投资
 
         // Reinvest
         if (s_isActive) {
+            //所有的投资都要经过此函数
             _investFunds(IERC20(asset()).balanceOf(address(this)));
         }
     }
+
     // slither-disable-end reentrancy-eth
 
     /*//////////////////////////////////////////////////////////////
                                FUNCTIONS
     //////////////////////////////////////////////////////////////*/
     // We use a struct to avoid stack too deep errors. Thanks Solidity
-    constructor(ConstructorData memory constructorData)
+    constructor(
+        ConstructorData memory constructorData
+    )
         ERC4626(constructorData.asset)
         ERC20(constructorData.vaultName, constructorData.vaultSymbol)
         AaveAdapter(constructorData.aavePool)
-        UniswapAdapter(constructorData.uniswapRouter, constructorData.weth, constructorData.usdc)
+        //written 爲什麽全部都是weth 和 usdc ，link呢？
+        //@audit-medium 所有的vaultshares测试都是基于wethvault，并没有测试usdc和link，一定有大问题,况且uniswap的投资是设计weth和usdc
+        //@audit 接着上面的注释说，由于uniswapadapter硬编码了函数，所以如果创建了link合约，实际的投资依然不过还是link和weth，并不影响，只是名称不同
+
+        UniswapAdapter(
+            constructorData.uniswapRouter,
+            constructorData.weth,
+            constructorData.usdc
+        )
     {
         i_guardian = constructorData.guardian;
         i_guardianAndDaoCut = constructorData.guardianAndDaoCut;
@@ -102,10 +125,22 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
         s_isActive = true;
         updateHoldingAllocation(constructorData.allocationData);
 
+        //written aave不是必须要存两个代币吗，这里只有一个资产该如何存入？uniswap类似
+        //e 这并不是资产的交互，只是实例化aavetoken和uniswap的特定代币token
+        //e aave不是uniswap，它只需要存一种代币即可，因为aave是借贷而不是流动性市场的提供
         // External calls
-        i_aaveAToken =
-            IERC20(IPool(constructorData.aavePool).getReserveData(address(constructorData.asset)).aTokenAddress);
-        i_uniswapLiquidityToken = IERC20(i_uniswapFactory.getPair(address(constructorData.asset), address(i_weth)));
+        i_aaveAToken = IERC20(
+            IPool(constructorData.aavePool)
+                .getReserveData(address(constructorData.asset))
+                .aTokenAddress
+        );
+        //@audit-high 如果asset是weth，那么getpair只会返回weth/weth 就是一个错误的地址值
+        i_uniswapLiquidityToken = IERC20(
+            i_uniswapFactory.getPair(
+                address(constructorData.asset),
+                address(i_weth)
+            )
+        );
     }
 
     /**
@@ -121,12 +156,18 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
      * @notice Allows Vault Guardians to update their allocation ratio (and thus, their strategy of investment)
      * @param tokenAllocationData The new allocation data
      */
-    function updateHoldingAllocation(AllocationData memory tokenAllocationData) public onlyVaultGuardians isActive {
-        uint256 totalAllocation = tokenAllocationData.holdAllocation + tokenAllocationData.uniswapAllocation
-            + tokenAllocationData.aaveAllocation;
+    function updateHoldingAllocation(
+        AllocationData memory tokenAllocationData
+    ) public onlyVaultGuardians isActive {
+        uint256 totalAllocation = tokenAllocationData.holdAllocation +
+            tokenAllocationData.uniswapAllocation +
+            tokenAllocationData.aaveAllocation;
+        //e total is 1000
         if (totalAllocation != ALLOCATION_PRECISION) {
             revert VaultShares__AllocationNot100Percent(totalAllocation);
         }
+        //written update 策略后 让全局变量s_allocationData更新,如果此时有人调用deposit，redeem等会出发investFunds的函数，都会读取s_allocation
+        //e yeah
         s_allocationData = tokenAllocationData;
         emit UpdatedAllocation(tokenAllocationData);
     }
@@ -137,7 +178,15 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
      * @notice Mints shares to the DAO and the guardian as a fee
      */
     // slither-disable-start reentrancy-eth
-    function deposit(uint256 assets, address receiver)
+
+    //written 我需要試著將用戶在withdrew和redeem,deposit時不斷的去update投資策略并且進行重新投資,試著寫個模糊測試吧。
+    //如果测试有问题，可以试着先写uint=》deposit ，updateinvest，redeem @audit -? fuzz test be needed
+    //written 如果我用非允许的代币进行质押会怎么办？
+    //@audit-? needs prove
+    function deposit(
+        uint256 assets,
+        address receiver
+    )
         public
         override(ERC4626, IERC4626)
         isActive
@@ -145,7 +194,11 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
         returns (uint256)
     {
         if (assets > maxDeposit(receiver)) {
-            revert VaultShares__DepositMoreThanMax(assets, maxDeposit(receiver));
+            //e type(uint256).max
+            revert VaultShares__DepositMoreThanMax(
+                assets,
+                maxDeposit(receiver)
+            );
         }
 
         uint256 shares = previewDeposit(assets);
@@ -163,21 +216,24 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
      * @param assets The amount of assets to invest
      */
     function _investFunds(uint256 assets) private {
-        uint256 uniswapAllocation = (assets * s_allocationData.uniswapAllocation) / ALLOCATION_PRECISION;
-        uint256 aaveAllocation = (assets * s_allocationData.aaveAllocation) / ALLOCATION_PRECISION;
+        uint256 uniswapAllocation = (assets *
+            s_allocationData.uniswapAllocation) / ALLOCATION_PRECISION; //1 ether*300/1000
+        uint256 aaveAllocation = (assets * s_allocationData.aaveAllocation) /
+            ALLOCATION_PRECISION;
 
         emit FundsInvested();
-
         _uniswapInvest(IERC20(asset()), uniswapAllocation);
         _aaveInvest(IERC20(asset()), aaveAllocation);
     }
 
     // slither-disable-start reentrancy-benign
-    /* 
-     * @notice Unintelligently just withdraws everything, and then reinvests it all. 
-     * @notice Anyone can call this and pay the gas costs to rebalance the portfolio at any time. 
-     * @dev We understand that this is horrible for gas costs. 
+    /*
+     * @notice Unintelligently just withdraws everything, and then reinvests it all.
+     * @notice Anyone can call this and pay the gas costs to rebalance the portfolio at any time.
+     * @dev We understand that this is horrible for gas costs.
      */
+    //written 任何人都有权利去rebalance，太荒谬了吧
+    //@audit-? 试着让攻击者去攻击rebalancefunds,原代码測試沒有设计到
     function rebalanceFunds() public isActive divestThenInvest nonReentrant {}
 
     /**
@@ -186,12 +242,18 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
      * We first divest our assets so we get a good idea of how many assets we hold.
      * Then, we redeem for the user, and automatically reinvest.
      */
-    function withdraw(uint256 assets, address receiver, address owner)
+    function withdraw(
+        uint256 assets,
+        address receiver,
+        address owner
+    )
         public
         override(IERC4626, ERC4626)
         divestThenInvest
         nonReentrant
         returns (uint256)
+    //written 如果有人在进行withdraw或者redeem时，又有人在deposit怎么办？
+    //@audit-? needs prove
     {
         uint256 shares = super.withdraw(assets, receiver, owner);
         return shares;
@@ -203,7 +265,13 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
      * We first divest our assets so we get a good idea of how many assets we hold.
      * Then, we redeem for the user, and automatically reinvest.
      */
-    function redeem(uint256 shares, address receiver, address owner)
+    //written 如果receiver和owner不是一个人的情况下，这种情形该怎么测试
+    //@audit-? needs prove
+    function redeem(
+        uint256 shares,
+        address receiver,
+        address owner
+    )
         public
         override(IERC4626, ERC4626)
         divestThenInvest
@@ -213,6 +281,7 @@ contract VaultShares is ERC4626, IVaultShares, AaveAdapter, UniswapAdapter, Reen
         uint256 assets = super.redeem(shares, receiver, owner);
         return assets;
     }
+
     // slither-disable-end reentrancy-eth
     // slither-disable-end reentrancy-benign
 

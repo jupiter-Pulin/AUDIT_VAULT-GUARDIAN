@@ -18,7 +18,7 @@ contract AaveAdapter {
 
     /**
      * @notice Used by the vault to deposit vault's underlying asset token as lending amount in Aave v3
-     * @param asset The vault's underlying asset token 
+     * @param asset The vault's underlying asset token
      * @param amount The amount of vault's underlying asset token to invest
      */
     function _aaveInvest(IERC20 asset, uint256 amount) internal {
@@ -39,7 +39,12 @@ contract AaveAdapter {
      * @param token The vault's underlying asset token to withdraw
      * @param amount The amount of vault's underlying asset token to withdraw
      */
-    function _aaveDivest(IERC20 token, uint256 amount) internal returns (uint256 amountOfAssetReturned) {
+    function _aaveDivest(
+        IERC20 token,
+        uint256 amount
+    ) internal returns (uint256 amountOfAssetReturned) {
+        //written 为什么这个amountOfAssetReturned不去返回？
+        //@audit-info
         i_aavePool.withdraw({
             asset: address(token),
             amount: amount,

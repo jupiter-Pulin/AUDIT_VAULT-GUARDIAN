@@ -5,6 +5,7 @@ import {IPool, DataTypes} from "../../src/vendor/IPool.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract AavePoolMock is IPool {
+    //@audit 这个合约的atoken并没有实现锻造，和注销的功能
     mapping(address => address) public s_assetToAtoken;
 
     function updateAtokenAddress(address asset, address aToken) public {

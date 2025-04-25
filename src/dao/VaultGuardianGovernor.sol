@@ -4,11 +4,20 @@ pragma solidity 0.8.20;
 import {Governor} from "@openzeppelin/contracts/governance/Governor.sol";
 import {GovernorCountingSimple} from "@openzeppelin/contracts/governance/extensions/GovernorCountingSimple.sol";
 import {GovernorVotes, IVotes} from "@openzeppelin/contracts/governance/extensions/GovernorVotes.sol";
-import {GovernorVotesQuorumFraction} from
-    "@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFraction.sol";
+import {GovernorVotesQuorumFraction} from "@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFraction.sol";
 
-contract VaultGuardianGovernor is Governor, GovernorCountingSimple, GovernorVotes, GovernorVotesQuorumFraction {
-    constructor(IVotes _voteToken)
+//written 只有成为守护者才能参与社区的治理
+//written 我能否从治理者的角度来攻击代币
+//@audit
+contract VaultGuardianGovernor is
+    Governor,
+    GovernorCountingSimple,
+    GovernorVotes,
+    GovernorVotesQuorumFraction
+{
+    constructor(
+        IVotes _voteToken
+    )
         Governor("VaultGuardianGovernor")
         GovernorVotes(_voteToken)
         GovernorVotesQuorumFraction(4)
@@ -24,7 +33,9 @@ contract VaultGuardianGovernor is Governor, GovernorCountingSimple, GovernorVote
 
     // The following functions are overrides required by Solidity.
 
-    function quorum(uint256 blockNumber)
+    function quorum(
+        uint256 blockNumber
+    )
         public
         view
         override(Governor, GovernorVotesQuorumFraction)
