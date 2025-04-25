@@ -227,7 +227,7 @@ contract VaultSharesTest is Base_Test {
         //written 爲什麽在兩次質押完成後，uniswapLiquidity token 是0呢？
         //e 因为liquiditytoken是uniswap的weth/weth，所以该池子是返回的0
         //written 那为什么aave返回的也是0？ 这个的投资为什么投不了
-        //@audit
+        //@audit 因为aavepool根本没有锻造功能，然后他的atoken自然就会为0（在此场景中atoken为awethmock）
     }
 
     function testWithdraw() public hasGuardian userIsInvested {
