@@ -108,11 +108,12 @@ contract VaultShares is
     )
         ERC4626(constructorData.asset)
         ERC20(constructorData.vaultName, constructorData.vaultSymbol)
+        //written aave这里mint不出任何东西，所以测试会是0
         AaveAdapter(constructorData.aavePool)
-        //written 爲什麽全部都是weth 和 usdc ，link呢？
-        //@audit-medium 所有的vaultshares测试都是基于wethvault，并没有测试usdc和link，一定有大问题,况且uniswap的投资是设计weth和usdc
-        //@audit 接着上面的注释说，由于uniswapadapter硬编码了函数，所以如果创建了link合约，实际的投资依然不过还是link和weth，并不影响，只是名称不同
+        //@written 所有的vaultshares测试都是基于wethvault，并没有测试usdc和link，一定有大问题,况且uniswap的投资是设计weth和usdc
+        //@written 接着上面的注释说，由于uniswapadapter硬编码了函数，所以如果创建了link合约，实际的投资依然不过还是link和weth，并不影响，只是名称不同
 
+        //written uniswap这里liquiditytoken是有mint的
         UniswapAdapter(
             constructorData.uniswapRouter,
             constructorData.weth,
@@ -134,7 +135,7 @@ contract VaultShares is
                 .getReserveData(address(constructorData.asset))
                 .aTokenAddress
         );
-        //@audit-high 如果asset是weth，那么getpair只会返回weth/weth 就是一个错误的地址值
+        //@audit-high 如果asset是weth，那么getpair只会返回weth/weth 就是一个错误的地址值      done
         i_uniswapLiquidityToken = IERC20(
             i_uniswapFactory.getPair(
                 address(constructorData.asset),
@@ -182,7 +183,7 @@ contract VaultShares is
     //written 我需要試著將用戶在withdrew和redeem,deposit時不斷的去update投資策略并且進行重新投資,試著寫個模糊測試吧。
     //如果测试有问题，可以试着先写uint=》deposit ，updateinvest，redeem @audit -? fuzz test be needed
     //written 如果我用非允许的代币进行质押会怎么办？
-    //@audit-? needs prove
+    //e 他是直接safetransferfrom，你余额里没有这个 若这个保险库为wethvault，那么你没有weth，你就会报错
     function deposit(
         uint256 assets,
         address receiver
@@ -202,6 +203,9 @@ contract VaultShares is
         }
 
         uint256 shares = previewDeposit(assets);
+        //@audit-high(done!!!) totalasset算的是本合约的价值，但是并没有计算投资的价值，即previewDeposit算的是shares= asset*totalSupply/totalAssets ，
+        //如果你的asset原本为10，现在留在合约的只有5，那么 分配给你的shares会比之前的人更高
+        //@ 注意 ，紧接上段：这会导致如果用户进行赎回或者withdraw，代码是直接基于=>assets=(shares*totalAssets)/totalSupply，如果totalasset减少，那么asset的值也会减少
         _deposit(_msgSender(), receiver, assets, shares);
 
         _mint(i_guardian, shares / i_guardianAndDaoCut);
@@ -233,7 +237,6 @@ contract VaultShares is
      * @dev We understand that this is horrible for gas costs.
      */
     //written 任何人都有权利去rebalance，太荒谬了吧
-    //@audit-? 试着让攻击者去攻击rebalancefunds,原代码測試沒有设计到
     function rebalanceFunds() public isActive divestThenInvest nonReentrant {}
 
     /**
@@ -253,7 +256,7 @@ contract VaultShares is
         nonReentrant
         returns (uint256)
     //written 如果有人在进行withdraw或者redeem时，又有人在deposit怎么办？
-    //@audit-? needs prove
+    //e OKAY
     {
         uint256 shares = super.withdraw(assets, receiver, owner);
         return shares;
@@ -266,7 +269,8 @@ contract VaultShares is
      * Then, we redeem for the user, and automatically reinvest.
      */
     //written 如果receiver和owner不是一个人的情况下，这种情形该怎么测试
-    //@audit-? needs prove
+    //@audit-high !!!这还真是一个大错误      done
+
     function redeem(
         uint256 shares,
         address receiver,

@@ -71,7 +71,7 @@ contract VaultGuardiansBase is AStaticTokenData, IVaultData {
     address private immutable i_uniswapV2Router;
     VaultGuardianToken private immutable i_vgToken;
 
-    //@audit-gas never been use ,請把其刪除
+    //@audit-gas never been use ,請把其刪除 done
     uint256 private constant GUARDIAN_FEE = 0.1 ether;
 
     // DAO updatable values
@@ -85,8 +85,6 @@ contract VaultGuardiansBase is AStaticTokenData, IVaultData {
     //e yeah
     mapping(address guardianAddress => mapping(IERC20 asset => IVaultShares vaultShares))
         private s_guardians;
-    //written 不需要将其设置为modifer 在weth,USDC,LINK的时候先检查是approve的吗
-    //@audit -? needs prove
     mapping(address token => bool approved) private s_isApprovedToken;
 
     /*//////////////////////////////////////////////////////////////
@@ -205,7 +203,7 @@ contract VaultGuardiansBase is AStaticTokenData, IVaultData {
             tokenVault = new VaultShares(
                 IVaultShares.ConstructorData({
                     asset: token,
-                    //@audit-low/medium mix-up the Name and symbol
+                    //@audit-low/medium mix-up the Name and symbol  done
                     vaultName: TOKEN_ONE_VAULT_NAME,
                     vaultSymbol: TOKEN_ONE_VAULT_SYMBOL,
                     guardian: msg.sender,
@@ -216,7 +214,7 @@ contract VaultGuardiansBase is AStaticTokenData, IVaultData {
                     vaultGuardians: address(this),
                     weth: address(i_weth),
                     //written 为什么需要USDC而不需要link
-                    //@audit -?  目前以我的审阅来看确实不需要，只是要把vaultname和symbol更改
+                    //e 确实不需要，因为我们传给ERC4626的资产为 token 在此为link，只不过名字搞错了
                     usdc: address(i_tokenOne)
                 })
             );

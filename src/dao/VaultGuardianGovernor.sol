@@ -8,7 +8,6 @@ import {GovernorVotesQuorumFraction} from "@openzeppelin/contracts/governance/ex
 
 //written 只有成为守护者才能参与社区的治理
 //written 我能否从治理者的角度来攻击代币
-//@audit
 contract VaultGuardianGovernor is
     Governor,
     GovernorCountingSimple,

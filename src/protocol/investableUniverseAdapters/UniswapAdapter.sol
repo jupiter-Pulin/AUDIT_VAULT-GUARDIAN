@@ -92,8 +92,8 @@ contract UniswapAdapter is AStaticUSDCData {
         ) = i_uniswapRouter.addLiquidity({
                 tokenA: address(token),
                 tokenB: address(counterPartyToken),
-                amountADesired: amountOfTokenToSwap + amounts[0],
-                amountBDesired: amounts[1],
+                amountADesired: amountOfTokenToSwap + amounts[0], //@audit-high 这里的添加量应该是amountOfTokenToSwap，amounts[0]已经是一半的amount量了
+                amountBDesired: amounts[1], // written 按照mock的执行，amounts[1]=0 因为amountoutmin=0 =》mint（amountoutmint，to）      done!!!
                 amountAMin: 0,
                 amountBMin: 0,
                 to: address(this),

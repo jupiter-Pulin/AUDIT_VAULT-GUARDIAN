@@ -8,8 +8,8 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 contract VaultGuardianToken is ERC20, ERC20Permit, ERC20Votes, Ownable {
     //written 从合约是没有煅烧功能的 意味着vaultGuardianToken无法被销毁，即使基金经理人退出项目，仍然会保留投票权
-    //written 攻击者可以先成为守护者后立刻退出，积累了vgtoken用于操纵社区进行对他们有利的投票
-    //@audit-? maybe high !!! needs prove
+    //written 攻击者可以先成为守护者后立刻退出，积累了vgtoken用于操纵社区进行对他们有利的投票,但我不知道他們如何用DAO進行vote
+    //@audit-high !!! done
     constructor()
         ERC20("VaultGuardianToken", "VGT")
         ERC20Permit("VaultGuardianToken")
